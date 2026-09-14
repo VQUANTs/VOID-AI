@@ -1,0 +1,23 @@
+__pycache__/
+*.pyc
+*.pyo
+*.db
+*.sqlite
+*.sqlite3
+
+.env
+.env.*
+*.key
+*secret*
+
+.venv/
+venv/
+env/
+
+telegram.log
+
+.idea/
+.vscode/
+
+# Local development backups
+*_before_*.py
