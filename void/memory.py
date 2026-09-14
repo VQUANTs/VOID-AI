@@ -12,7 +12,7 @@ class Memory:
         if directory:
             os.makedirs(directory, exist_ok=True)
 
-        self.db = sqlite3.connect(path)
+        self.db = sqlite3.connect(path, check_same_thread=False)
 
         self.db.execute("""
         CREATE TABLE IF NOT EXISTS messages (
