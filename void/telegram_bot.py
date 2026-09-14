@@ -168,6 +168,31 @@ Task:
 
             return True
 
+        if text == "/status":
+
+            status = self.ai.model.get_status()
+
+            message = (
+                "╔══════════════════════════════════╗\n"
+                "║          VOID STATUS             ║\n"
+                "╠══════════════════════════════════╣\n"
+                "║ CORE       : ONLINE              ║\n"
+                "║ MEMORY     : ONLINE              ║\n"
+                f"║ MODEL      : {status['model']:<20}║\n"
+                f"║ PROVIDER   : {status['provider']:<20}║\n"
+                "║ AGENT      : READY               ║\n"
+                "║ TASKS      : READY               ║\n"
+                f"║ TOOLS      : {len(self.agent.tools.definitions()):<20}║\n"
+                "╚══════════════════════════════════╝"
+            )
+
+            self.send_message(
+                chat_id,
+                message
+            )
+
+            return True
+
         if text == "/tasks":
 
             task_list = self.tasks.list_tasks()

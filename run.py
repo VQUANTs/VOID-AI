@@ -64,6 +64,28 @@ Type /help
             print(f"MODEL: {status['model']}")
             continue
 
+        if user == "/status":
+            status = ai.model.get_status()
+
+            print("""
+╔══════════════════════════════════╗
+║          VOID STATUS             ║
+╠══════════════════════════════════╣
+║ CORE       : ONLINE              ║
+║ MEMORY     : ONLINE              ║
+║ MODEL      : {model:<20}║
+║ PROVIDER   : {provider:<20}║
+║ AGENT      : READY               ║
+║ TASKS      : READY               ║
+║ TOOLS      : {tools:<20}║
+╚══════════════════════════════════╝
+""".format(
+                model=status["model"],
+                provider=status["provider"],
+                tools=len(agent.tools.definitions())
+            ))
+            continue
+
         if user == "/tasks":
             task_list = tasks.list_tasks()
 
@@ -85,6 +107,7 @@ Type /help
 /help     Show commands
 /clear    Clear conversation memory
 /model    Show current model route
+/status   Show VOID system status
 /agent    Run a multi-step agent task
 /tasks    Show task history
 /exit     Exit VOID
