@@ -8,6 +8,7 @@ from void.config import Config
 from void.core import VoidCore
 from void.agents import Agent
 from void.tasks import TaskManager
+from void.output import VoidOutput
 
 
 class TelegramBot:
@@ -272,9 +273,11 @@ Task:
                 answer
             )
 
+            formatted = VoidOutput.format(answer)
+
             self.send_message(
                 chat_id,
-                "VOID AGENT >\n\n" + answer
+                "VOID AGENT >\n\n" + formatted
             )
 
         except Exception as error:
@@ -320,11 +323,15 @@ Task:
                 task["result"]
             )
 
+            formatted = VoidOutput.format(
+                task["result"]
+            )
+
             result = (
                 f"TASK ID: {task['id']}\n"
                 f"STATUS: {task['status']}\n\n"
                 f"VOID TASK >\n\n"
-                f"{task['result']}"
+                f"{formatted}"
             )
 
             self.send_message(
@@ -349,9 +356,11 @@ Task:
 
             answer = self.ai.ask(text)
 
+            formatted = VoidOutput.format(answer)
+
             self.send_message(
                 chat_id,
-                "VOID >\n\n" + answer
+                "VOID >\n\n" + formatted
             )
 
         except Exception as error:
