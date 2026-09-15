@@ -150,6 +150,62 @@ class TelegramBot:
 
         return upload, response.content
 
+    def download_video(self, video):
+
+        import requests
+
+        file_id = video.get("file_id")
+
+        if not file_id:
+            raise ValueError(
+                "Telegram video has no file_id."
+            )
+
+        file_info = self.api(
+            "getFile",
+            {
+                "file_id": file_id
+            }
+        )
+
+        file_path = file_info.get(
+            "file_path"
+        )
+
+        if not file_path:
+            raise RuntimeError(
+                "Telegram returned no video file path."
+            )
+
+        response = requests.get(
+            "https://api.telegram.org/file/bot"
+            + self.token
+            + "/"
+            + file_path,
+            timeout=120
+        )
+
+        response.raise_for_status()
+
+        video_bytes = response.content
+
+        if not video_bytes:
+            raise RuntimeError(
+                "Telegram returned an empty video."
+            )
+
+        if len(video_bytes) > 10 * 1024 * 1024:
+            raise ValueError(
+                "Video exceeds VOID's 10 MB video limit."
+            )
+
+        mime_type = (
+            video.get("mime_type")
+            or "video/mp4"
+        )
+
+        return video_bytes, mime_type
+
     def download_document(self, document):
 
         import requests
@@ -555,6 +611,66 @@ Task:
                 self.send_message(
                     chat_id,
                     f"VOID IMAGE ERROR:\n{error}"
+                )
+
+            return
+
+        # --------------------------------------------------
+        # Video upload
+        # --------------------------------------------------
+
+        video = message.get("video")
+
+        if video:
+
+            try:
+
+                self.send_message(
+                    chat_id,
+                    "VOID VIDEO > Analyzing video..."
+                )
+
+                video_bytes, mime_type = (
+                    self.download_video(
+                        video
+                    )
+                )
+
+                prompt = (
+                    message.get("caption")
+                    or ""
+                ).strip()
+
+                if not prompt:
+                    prompt = (
+                        "Analyze this video carefully. "
+                        "Describe the important visual and "
+                        "audio events, explain what is happening, "
+                        "and include timestamps for important "
+                        "moments when useful."
+                    )
+
+                answer = self.ai.ask_video(
+                    video_bytes,
+                    mime_type,
+                    prompt
+                )
+
+                formatted = VoidOutput.format(
+                    answer
+                )
+
+                self.send_message(
+                    chat_id,
+                    "VOID VIDEO >\n\n"
+                    + formatted
+                )
+
+            except Exception as error:
+
+                self.send_message(
+                    chat_id,
+                    f"VOID VIDEO ERROR:\n{error}"
                 )
 
             return

@@ -1,6 +1,7 @@
 import base64
 import json
 import requests
+import time
 
 from .config import Config
 
@@ -306,6 +307,173 @@ class ModelEngine:
     # --------------------------------------------------
     # Groq request
     # --------------------------------------------------
+
+    # --------------------------------------------------
+    # Gemini video request
+    # --------------------------------------------------
+
+    def chat_with_video(
+        self,
+        video_bytes,
+        mime_type,
+        prompt
+    ):
+
+        if not isinstance(
+            video_bytes,
+            (bytes, bytearray)
+        ):
+            raise RuntimeError(
+                "Video data must be bytes."
+            )
+
+        if not video_bytes:
+            raise RuntimeError(
+                "Video data is empty."
+            )
+
+        if not mime_type:
+            mime_type = "video/mp4"
+
+        if not self.gemini_key:
+            raise RuntimeError(
+                "GEMINI_API_KEY is not configured."
+            )
+
+        # Gemini inline video requests are intended
+        # for smaller one-off videos.
+        if len(video_bytes) > 10 * 1024 * 1024:
+            raise RuntimeError(
+                "Video exceeds VOID's 10 MB video limit."
+            )
+
+        video_base64 = base64.b64encode(
+            video_bytes
+        ).decode("ascii")
+
+        payload = {
+            "contents": [
+                {
+                    "parts": [
+                        {
+                            "inline_data": {
+                                "mime_type": mime_type,
+                                "data": video_base64
+                            }
+                        },
+                        {
+                            "text": prompt
+                        }
+                    ]
+                }
+            ],
+            "generationConfig": {
+                "temperature": 0.7,
+                "maxOutputTokens": 1200
+            }
+        }
+
+        url = (
+            "https://generativelanguage.googleapis.com/"
+            "v1beta/models/"
+            f"{Config.GEMINI_VIDEO_MODEL}:generateContent"
+        )
+
+        headers = {
+            "x-goog-api-key": self.gemini_key,
+            "Content-Type": "application/json"
+        }
+
+        # Retry temporary Gemini availability/rate-limit errors.
+        # Do not retry permanent request/authentication errors.
+        retry_statuses = {
+            429, 500, 502, 503, 504
+        }
+
+        response = None
+
+        for attempt in range(3):
+            try:
+                response = requests.post(
+                    url,
+                    json=payload,
+                    headers=headers,
+                    timeout=(15, 300)
+                )
+            except requests.RequestException as error:
+                if attempt == 2:
+                    raise RuntimeError(
+                        f"Gemini video request failed: {error}"
+                    )
+                time.sleep(2 ** attempt)
+                continue
+
+            if response.status_code not in retry_statuses:
+                break
+
+            if attempt < 2:
+                time.sleep(2 ** attempt)
+
+        if response is None:
+            raise RuntimeError(
+                "Gemini video request returned no response."
+            )
+
+        if response.status_code >= 400:
+            try:
+                error_data = response.json()
+            except Exception:
+                error_data = response.text
+
+            raise RuntimeError(
+                f"Gemini video HTTP error "
+                f"{response.status_code}: "
+                f"{error_data}"
+            )
+
+        try:
+            data = response.json()
+        except Exception as e:
+            raise RuntimeError(
+                f"Invalid JSON response from video model: {e}"
+            )
+
+        candidates = data.get("candidates")
+
+        if not candidates:
+            raise RuntimeError(
+                "Video model returned no candidates."
+            )
+
+        content = (
+            candidates[0]
+            .get("content", {})
+        )
+
+        parts = content.get("parts", [])
+
+        answers = []
+
+        for part in parts:
+
+            text = part.get("text")
+
+            if isinstance(text, str) and text.strip():
+                answers.append(text.strip())
+
+        answer = "\n".join(answers).strip()
+
+        if not answer:
+            raise RuntimeError(
+                "Video model returned an empty answer."
+            )
+
+        self.last_route = "video"
+        self.last_provider = "gemini"
+        self.last_model = Config.GEMINI_VIDEO_MODEL
+        self.last_error = None
+
+        return answer
 
     def _groq_request(
         self,

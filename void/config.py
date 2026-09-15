@@ -37,6 +37,7 @@ class Config:
     )
 
     GEMINI_MODEL = "gemini-3.6-flash"
+    GEMINI_VIDEO_MODEL = "gemini-3.8-flash"
 
     DEFAULT_MODEL = GEMINI_MODEL
 

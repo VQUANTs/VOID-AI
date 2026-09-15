@@ -336,6 +336,56 @@ Important:
         return answer
 
     # --------------------------------------------------
+    # Ask VOID about a video
+    # --------------------------------------------------
+
+    def ask_video(
+        self,
+        video_bytes,
+        mime_type,
+        prompt
+    ):
+
+        if not prompt:
+            prompt = (
+                "Analyze this video carefully. "
+                "Describe the important visual and audio "
+                "events, explain what is happening, and "
+                "include timestamps when useful."
+            )
+
+        self.memory.add(
+            "user",
+            "[VIDEO] " + prompt
+        )
+
+        try:
+
+            answer = self.model.chat_with_video(
+                video_bytes,
+                mime_type,
+                prompt
+            )
+
+        except Exception as e:
+
+            raise RuntimeError(
+                f"Video model request failed: {e}"
+            )
+
+        if not answer:
+            raise RuntimeError(
+                "Video model returned an empty answer."
+            )
+
+        self.memory.add(
+            "assistant",
+            answer
+        )
+
+        return answer
+
+    # --------------------------------------------------
     # Ask VOID
     # --------------------------------------------------
 
