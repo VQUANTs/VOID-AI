@@ -91,6 +91,65 @@ class TelegramBot:
     # Telegram file download
     # --------------------------------------------------
 
+    def download_photo(self, photo):
+
+        import requests
+
+        if not photo:
+            raise ValueError(
+                "Telegram photo has no photo sizes."
+            )
+
+        # Telegram sends multiple resolutions.
+        # Use the largest available image.
+        largest = max(
+            photo,
+            key=lambda item: (
+                item.get("width", 0) * item.get("height", 0),
+                item.get("file_size", 0)
+            )
+        )
+
+        file_id = largest.get("file_id")
+
+        if not file_id:
+            raise ValueError(
+                "Telegram photo has no file_id."
+            )
+
+        file_info = self.api(
+            "getFile",
+            {"file_id": file_id}
+        )
+
+        file_path = file_info.get("file_path")
+
+        if not file_path:
+            raise RuntimeError(
+                "Telegram returned no photo file path."
+            )
+
+        response = requests.get(
+            "https://api.telegram.org/file/bot"
+            + self.token
+            + "/"
+            + file_path,
+            timeout=60
+        )
+
+        response.raise_for_status()
+
+        from void.uploads import UploadManager
+
+        manager = UploadManager()
+
+        upload = manager.save_bytes(
+            "telegram_image.jpg",
+            response.content
+        )
+
+        return upload, response.content
+
     def download_document(self, document):
 
         import requests
@@ -442,6 +501,63 @@ Task:
             return
 
         chat_id = chat.get("id")
+
+        # --------------------------------------------------
+        # Image upload
+        # --------------------------------------------------
+
+        photo = message.get("photo")
+
+        if photo:
+
+            try:
+
+                self.send_message(
+                    chat_id,
+                    "VOID IMAGE > Analyzing image..."
+                )
+
+                upload, image_bytes = self.download_photo(
+                    photo
+                )
+
+                prompt = (
+                    message.get("caption")
+                    or ""
+                ).strip()
+
+                if not prompt:
+                    prompt = (
+                        "Analyze this image carefully. "
+                        "Describe what is visible, identify "
+                        "important details, and explain anything "
+                        "that appears relevant."
+                    )
+
+                answer = self.ai.ask_image(
+                    image_bytes,
+                    upload["mime_type"],
+                    prompt
+                )
+
+                formatted = VoidOutput.format(
+                    answer
+                )
+
+                self.send_message(
+                    chat_id,
+                    "VOID IMAGE >\n\n"
+                    + formatted
+                )
+
+            except Exception as error:
+
+                self.send_message(
+                    chat_id,
+                    f"VOID IMAGE ERROR:\n{error}"
+                )
+
+            return
 
         # --------------------------------------------------
         # Document upload

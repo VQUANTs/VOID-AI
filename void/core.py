@@ -249,6 +249,93 @@ Important:
         return None
 
     # --------------------------------------------------
+    # Ask VOID about an image
+    # --------------------------------------------------
+
+    def ask_image(
+        self,
+        image_bytes,
+        mime_type,
+        prompt
+    ):
+
+        if not prompt:
+            prompt = (
+                "Analyze this image carefully and explain "
+                "what is visible in it."
+            )
+
+        self.memory.add(
+            "user",
+            "[IMAGE] " + prompt
+        )
+
+        try:
+
+            response = self.model.chat_with_image(
+                image_bytes,
+                mime_type,
+                prompt
+            )
+
+        except Exception as e:
+
+            raise RuntimeError(
+                f"Image model request failed: {e}"
+            )
+
+        try:
+
+            response.raise_for_status()
+
+        except Exception as e:
+
+            try:
+                error_data = response.json()
+            except Exception:
+                error_data = response.text
+
+            raise RuntimeError(
+                f"Image model HTTP error: {e}\n"
+                f"Details: {error_data}"
+            )
+
+        try:
+
+            data = response.json()
+
+        except Exception as e:
+
+            raise RuntimeError(
+                f"Invalid JSON response from image model: {e}\n"
+                f"Raw response: {response.text[:2000]}"
+            )
+
+        if "choices" not in data or not data["choices"]:
+            raise RuntimeError(
+                "Image model returned no usable choices."
+            )
+
+        message = data["choices"][0].get(
+            "message",
+            {}
+        )
+
+        answer = self.extract_answer(message)
+
+        if not answer:
+            raise RuntimeError(
+                "Image model returned an empty answer."
+            )
+
+        self.memory.add(
+            "assistant",
+            answer
+        )
+
+        return answer
+
+    # --------------------------------------------------
     # Ask VOID
     # --------------------------------------------------
 

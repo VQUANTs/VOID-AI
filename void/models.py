@@ -1,3 +1,4 @@
+import base64
 import json
 import requests
 
@@ -196,6 +197,72 @@ class ModelEngine:
             timeout=(15, 180),
             stream=stream
         )
+
+    # --------------------------------------------------
+    # Gemini image request
+    # --------------------------------------------------
+
+    def chat_with_image(
+        self,
+        image_bytes,
+        mime_type,
+        prompt
+    ):
+
+        if not self.gemini_key:
+            raise RuntimeError(
+                "GEMINI_API_KEY is not configured. "
+                "Image understanding currently requires Gemini."
+            )
+
+        if not isinstance(image_bytes, (bytes, bytearray)):
+            raise RuntimeError(
+                "Image data must be bytes."
+            )
+
+        if not mime_type:
+            mime_type = "image/jpeg"
+
+        image_base64 = base64.b64encode(
+            image_bytes
+        ).decode("ascii")
+
+        image_url = (
+            f"data:{mime_type};base64,"
+            f"{image_base64}"
+        )
+
+        messages = [
+            {
+                "role": "user",
+                "content": [
+                    {
+                        "type": "text",
+                        "text": prompt
+                    },
+                    {
+                        "type": "image_url",
+                        "image_url": {
+                            "url": image_url
+                        }
+                    }
+                ]
+            }
+        ]
+
+        response = self._gemini_request(
+            messages,
+            stream=False
+        )
+
+        self._check_response(response)
+
+        self.last_route = "vision"
+        self.last_provider = "gemini"
+        self.last_model = Config.GEMINI_MODEL
+        self.last_error = None
+
+        return response
 
     # --------------------------------------------------
     # Groq request
