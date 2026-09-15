@@ -209,12 +209,6 @@ class ModelEngine:
         prompt
     ):
 
-        if not self.gemini_key:
-            raise RuntimeError(
-                "GEMINI_API_KEY is not configured. "
-                "Image understanding currently requires Gemini."
-            )
-
         if not isinstance(image_bytes, (bytes, bytearray)):
             raise RuntimeError(
                 "Image data must be bytes."
@@ -250,16 +244,61 @@ class ModelEngine:
             }
         ]
 
-        response = self._gemini_request(
+        # --------------------------------------------------
+        # Primary: Gemini Vision
+        # --------------------------------------------------
+
+        if self.gemini_key:
+
+            response = self._gemini_request(
+                messages,
+                stream=False
+            )
+
+            # Gemini rate limits and transient server errors
+            # should fall through to the Groq vision model.
+            if response.status_code not in {
+                408,
+                429,
+                500,
+                502,
+                503,
+                504
+            }:
+
+                self._check_response(response)
+
+                self.last_route = "vision"
+                self.last_provider = "gemini"
+                self.last_model = Config.GEMINI_MODEL
+                self.last_error = None
+
+                return response
+
+        # --------------------------------------------------
+        # Fallback: Groq Vision
+        # --------------------------------------------------
+
+        if not self.groq_key:
+            if self.gemini_key:
+                self._check_response(response)
+
+            raise RuntimeError(
+                "No vision provider is available. "
+                "GEMINI_API_KEY and GROQ_API_KEY are missing."
+            )
+
+        response = self._groq_request(
             messages,
-            stream=False
+            stream=False,
+            model=Config.GROQ_VISION_MODEL
         )
 
         self._check_response(response)
 
         self.last_route = "vision"
-        self.last_provider = "gemini"
-        self.last_model = Config.GEMINI_MODEL
+        self.last_provider = "groq"
+        self.last_model = Config.GROQ_VISION_MODEL
         self.last_error = None
 
         return response
@@ -273,11 +312,15 @@ class ModelEngine:
         messages,
         stream=False,
         tools=None,
-        tool_choice=None
+        tool_choice=None,
+        model=None
     ):
 
+        if model is None:
+            model = Config.GROQ_MODEL
+
         payload = {
-            "model": Config.GROQ_MODEL,
+            "model": model,
             "messages": messages,
             "stream": stream,
             "temperature": 0.7,
