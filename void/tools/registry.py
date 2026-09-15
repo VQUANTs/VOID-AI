@@ -7,6 +7,7 @@ from pathlib import Path
 
 from ..memory import Memory
 from .web import WebSearch
+from ..uploads import UploadManager
 
 
 class ToolRegistry:
@@ -15,6 +16,7 @@ class ToolRegistry:
 
         self.memory = Memory()
         self.web = WebSearch()
+        self.uploads = UploadManager()
 
         self.tools = {
 
@@ -269,6 +271,44 @@ class ToolRegistry:
                     }
                 },
                 "handler": self.code_verify
+            },
+
+            # --------------------------------------------------
+            # Uploaded file read
+            # --------------------------------------------------
+
+            "uploaded_file_read": {
+                "definition": {
+                    "type": "function",
+                    "function": {
+                        "name": "uploaded_file_read",
+                        "description": (
+                            "Inspect and read a file uploaded by "
+                            "the user through VOID. Use this tool "
+                            "when the user asks you to analyze, "
+                            "summarize, inspect, explain, compare, "
+                            "or otherwise work with an uploaded "
+                            "file. Uploaded files are isolated "
+                            "from the VOID source tree. Do not "
+                            "execute uploaded files."
+                        ),
+                        "parameters": {
+                            "type": "object",
+                            "properties": {
+                                "path": {
+                                    "type": "string",
+                                    "description": (
+                                        "The uploaded file path "
+                                        "provided in the user's "
+                                        "file context."
+                                    )
+                                }
+                            },
+                            "required": ["path"]
+                        }
+                    }
+                },
+                "handler": self.uploaded_file_read
             },
 
             # --------------------------------------------------
@@ -974,6 +1014,14 @@ class ToolRegistry:
                 "max_total_chars": max_total_chars
             }
         }
+
+    # --------------------------------------------------
+    # Uploaded file read
+    # --------------------------------------------------
+
+    def uploaded_file_read(self, path):
+
+        return self.uploads.inspect(path)
 
     # --------------------------------------------------
     # Safe terminal
