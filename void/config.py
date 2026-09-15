@@ -22,6 +22,17 @@ class Config:
         ""
     )
 
+    HF_TOKEN = os.getenv(
+        "HF_TOKEN",
+        ""
+    )
+
+    HF_TEXT_MODEL = "Qwen/Qwen3-8B"
+
+    HF_IMAGE_MODEL = (
+        "black-forest-labs/FLUX.1-dev"
+    )
+
     GROQ_URL = (
         "https://api.groq.com/openai/v1/"
         "chat/completions"

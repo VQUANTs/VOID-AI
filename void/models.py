@@ -3,6 +3,8 @@ import json
 import requests
 import time
 
+from huggingface_hub import InferenceClient
+
 from .config import Config
 
 
@@ -12,6 +14,16 @@ class ModelEngine:
 
         self.gemini_key = Config.GEMINI_API_KEY
         self.groq_key = Config.GROQ_API_KEY
+        self.hf_token = Config.HF_TOKEN
+
+        self.hf_client = (
+            InferenceClient(
+                api_key=self.hf_token,
+                provider="auto"
+            )
+            if self.hf_token
+            else None
+        )
 
         self.models = {
             route: list(models)
@@ -303,6 +315,76 @@ class ModelEngine:
         self.last_error = None
 
         return response
+
+    # --------------------------------------------------
+    # Hugging Face request
+    # --------------------------------------------------
+
+    def _hf_request(
+        self,
+        messages,
+        model=None
+    ):
+
+        if not self.hf_client:
+            raise RuntimeError(
+                "HF_TOKEN is not configured."
+            )
+
+        if model is None:
+            model = Config.HF_TEXT_MODEL
+
+        completion = self.hf_client.chat_completion(
+            messages=messages,
+            model=model,
+            temperature=0.7,
+            max_tokens=1000
+        )
+
+        if not completion.choices:
+            raise RuntimeError(
+                "Hugging Face returned no choices."
+            )
+
+        choice = completion.choices[0]
+        message = choice.message
+
+        content = message.content
+
+        if content is None:
+            content = ""
+
+        if not content.strip():
+            raise RuntimeError(
+                "Hugging Face returned empty content."
+            )
+
+        data = {
+            "choices": [
+                {
+                    "index": 0,
+                    "message": {
+                        "role": "assistant",
+                        "content": content
+                    },
+                    "finish_reason": choice.finish_reason
+                }
+            ]
+        }
+
+        class HFResponseAdapter:
+
+            def __init__(self, payload):
+                self._payload = payload
+                self.status_code = 200
+
+            def raise_for_status(self):
+                return None
+
+            def json(self):
+                return self._payload
+
+        return HFResponseAdapter(data)
 
     # --------------------------------------------------
     # Groq request
@@ -643,6 +725,37 @@ class ModelEngine:
                     f"Groq: {error}"
                 )
 
+        # ----------------------------------------------
+        # FALLBACK: HUGGING FACE
+        # ----------------------------------------------
+
+        if self.hf_client:
+
+            try:
+
+                response = self._hf_request(
+                    messages
+                )
+
+                self._check_response(response)
+
+                self.last_provider = "huggingface"
+                self.last_model = Config.HF_TEXT_MODEL
+
+                self.last_error = (
+                    "; ".join(errors)
+                    if errors
+                    else None
+                )
+
+                return response
+
+            except Exception as error:
+
+                errors.append(
+                    f"Hugging Face: {error}"
+                )
+
         if errors:
 
             self.last_error = "; ".join(errors)
@@ -705,11 +818,14 @@ class ModelEngine:
         tools=None
     ):
 
-        if not self.gemini_key and not self.groq_key:
+        if (
+            not self.gemini_key
+            and not self.groq_key
+            and not self.hf_client
+        ):
 
             raise RuntimeError(
-                "Neither GEMINI_API_KEY nor "
-                "GROQ_API_KEY is configured."
+                "No model API keys are configured."
             )
 
         self.last_error = None

@@ -1,3 +1,5 @@
 requests==2.34.2
 
 pypdf==6.18.1
+
+huggingface_hub==1.31.0
