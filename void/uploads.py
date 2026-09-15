@@ -238,6 +238,55 @@ class UploadManager:
                 "10 MB processing limit."
             )
 
+        # --------------------------------------------------
+        # PDF
+        # --------------------------------------------------
+
+        if target.suffix.lower() == ".pdf":
+
+            try:
+                from pypdf import PdfReader
+
+                reader = PdfReader(str(target))
+
+                pages = []
+                total_chars = 0
+
+                for page_number, page in enumerate(reader.pages):
+
+                    page_text = page.extract_text() or ""
+
+                    if page_text:
+                        pages.append(
+                            f"\n--- PAGE {page_number + 1} ---\n"
+                            + page_text
+                        )
+
+                        total_chars += len(page_text)
+
+                    if total_chars >= self.MAX_TEXT_CHARS:
+                        break
+
+                content = "".join(pages)
+
+                if len(content) > self.MAX_TEXT_CHARS:
+                    content = content[:self.MAX_TEXT_CHARS]
+                    result["truncated"] = True
+
+                result["text_readable"] = bool(content)
+                result["content"] = content
+                result["page_count"] = len(reader.pages)
+
+                return result
+
+            except Exception as error:
+
+                result["error"] = (
+                    f"PDF text extraction failed: {error}"
+                )
+
+                return result
+
         if target.suffix.lower() not in self.TEXT_EXTENSIONS:
             return result
 
