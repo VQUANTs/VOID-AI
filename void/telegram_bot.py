@@ -88,6 +88,56 @@ class TelegramBot:
             )
 
     # --------------------------------------------------
+    # Telegram photo sending
+    # --------------------------------------------------
+
+    def send_photo(
+        self,
+        chat_id,
+        image_bytes,
+        filename="void_generated.png",
+        caption=None
+    ):
+
+        import requests
+
+        if not image_bytes:
+            raise ValueError(
+                "Generated image data is empty."
+            )
+
+        response = requests.post(
+            self.api_url + "sendPhoto",
+            data={
+                "chat_id": str(chat_id),
+                **(
+                    {"caption": caption}
+                    if caption
+                    else {}
+                )
+            },
+            files={
+                "photo": (
+                    filename,
+                    image_bytes,
+                    "image/png"
+                )
+            },
+            timeout=120
+        )
+
+        response.raise_for_status()
+
+        result = response.json()
+
+        if not result.get("ok"):
+            raise RuntimeError(
+                f"Telegram API error: {result}"
+            )
+
+        return result.get("result")
+
+    # --------------------------------------------------
     # Telegram file download
     # --------------------------------------------------
 
@@ -751,6 +801,46 @@ Task:
             return
 
         text = text.strip()
+
+        if text.startswith("/image"):
+
+            prompt = text[6:].strip()
+
+            if not prompt:
+                self.send_message(
+                    chat_id,
+                    "VOID IMAGE > Usage: /image <prompt>"
+                )
+                return
+
+            try:
+
+                self.send_message(
+                    chat_id,
+                    "VOID IMAGE > Generating..."
+                )
+
+                image_bytes = (
+                    self.ai.ask_image_generation(
+                        prompt
+                    )
+                )
+
+                self.send_photo(
+                    chat_id,
+                    image_bytes,
+                    filename="void_generated.png",
+                    caption="VOID IMAGE"
+                )
+
+            except Exception as error:
+
+                self.send_message(
+                    chat_id,
+                    f"VOID IMAGE ERROR:\n{error}"
+                )
+
+            return
 
         if text.startswith("/task"):
 

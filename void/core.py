@@ -336,6 +336,51 @@ Important:
         return answer
 
     # --------------------------------------------------
+    # Generate an image
+    # --------------------------------------------------
+
+    def ask_image_generation(
+        self,
+        prompt
+    ):
+
+        if not prompt or not prompt.strip():
+            raise RuntimeError(
+                "Image generation prompt cannot be empty."
+            )
+
+        prompt = prompt.strip()
+
+        self.memory.add(
+            "user",
+            "[IMAGE GENERATION] " + prompt
+        )
+
+        try:
+
+            image_bytes = self.model.generate_image(
+                prompt
+            )
+
+        except Exception as e:
+
+            raise RuntimeError(
+                f"Image generation failed: {e}"
+            )
+
+        if not image_bytes:
+            raise RuntimeError(
+                "Image generation returned empty data."
+            )
+
+        self.memory.add(
+            "assistant",
+            "[IMAGE GENERATED] " + prompt
+        )
+
+        return image_bytes
+
+    # --------------------------------------------------
     # Ask VOID about a video
     # --------------------------------------------------
 

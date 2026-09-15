@@ -317,6 +317,67 @@ class ModelEngine:
         return response
 
     # --------------------------------------------------
+    # Hugging Face image generation
+    # --------------------------------------------------
+
+    def generate_image(
+        self,
+        prompt,
+        model=None
+    ):
+
+        if not self.hf_client:
+            raise RuntimeError(
+                "HF_TOKEN is not configured."
+            )
+
+        if not prompt or not prompt.strip():
+            raise RuntimeError(
+                "Image prompt cannot be empty."
+            )
+
+        if model is None:
+            model = Config.HF_IMAGE_MODEL
+
+        image = self.hf_client.text_to_image(
+            prompt=prompt.strip(),
+            model=model
+        )
+
+        if image is None:
+            raise RuntimeError(
+                "Hugging Face returned no image."
+            )
+
+        try:
+            import io
+
+            buffer = io.BytesIO()
+            image.save(
+                buffer,
+                format="PNG"
+            )
+
+            image_bytes = buffer.getvalue()
+
+        except Exception as error:
+            raise RuntimeError(
+                f"Failed to encode generated image: {error}"
+            )
+
+        if not image_bytes:
+            raise RuntimeError(
+                "Generated image is empty."
+            )
+
+        self.last_route = "image_generation"
+        self.last_provider = "huggingface"
+        self.last_model = model
+        self.last_error = None
+
+        return image_bytes
+
+    # --------------------------------------------------
     # Hugging Face request
     # --------------------------------------------------
 
