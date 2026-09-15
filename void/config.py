@@ -28,7 +28,7 @@ class Config:
     )
 
     GROQ_MODEL = "openai/gpt-oss-20b"
-    GROQ_VISION_MODEL = "qwen/qwen3.6-27b"
+    GROQ_VISION_MODEL = "qwen/qwen3.8-27b"
 
 
     GEMINI_URL = (
