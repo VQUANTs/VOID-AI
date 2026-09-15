@@ -7,7 +7,7 @@ from pathlib import Path
 class UploadManager:
 
     MAX_FILE_BYTES = 10 * 1024 * 1024
-    MAX_TEXT_CHARS = 30000
+    MAX_TEXT_CHARS = 8000
 
     TEXT_EXTENSIONS = {
         ".txt",
