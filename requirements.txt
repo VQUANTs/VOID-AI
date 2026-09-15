@@ -3,3 +3,4 @@ requests==2.34.2
 pypdf==6.18.1
 
 huggingface_hub==1.31.0
+gradio_client>=2.7.0,<3.0.0

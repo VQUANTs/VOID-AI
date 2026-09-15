@@ -317,7 +317,7 @@ class ModelEngine:
         return response
 
     # --------------------------------------------------
-    # Hugging Face image generation
+    # ZeroGPU image generation
     # --------------------------------------------------
 
     def generate_image(
@@ -326,43 +326,65 @@ class ModelEngine:
         model=None
     ):
 
-        if not self.hf_client:
-            raise RuntimeError(
-                "HF_TOKEN is not configured."
-            )
-
         if not prompt or not prompt.strip():
             raise RuntimeError(
-                "Image prompt cannot be empty."
+                "Image generation prompt cannot be empty."
             )
 
         if model is None:
-            model = Config.HF_IMAGE_MODEL
-
-        image = self.hf_client.text_to_image(
-            prompt=prompt.strip(),
-            model=model
-        )
-
-        if image is None:
-            raise RuntimeError(
-                "Hugging Face returned no image."
-            )
+            model = "mrfakename/Z-Image-Turbo"
 
         try:
-            import io
+            from gradio_client import Client
 
-            buffer = io.BytesIO()
-            image.save(
-                buffer,
-                format="PNG"
+            client = Client(
+                model,
+                httpx_kwargs={
+                    "timeout": 180.0
+                }
             )
 
-            image_bytes = buffer.getvalue()
+            result = client.predict(
+                prompt.strip(),
+                1024,
+                1024,
+                9,
+                42,
+                True,
+                api_name="/generate_image"
+            )
 
         except Exception as error:
             raise RuntimeError(
-                f"Failed to encode generated image: {error}"
+                f"ZeroGPU image generation failed: {error}"
+            )
+
+        image_path = (
+            result[0]
+            if isinstance(result, tuple)
+            else result
+        )
+
+        if not image_path:
+            raise RuntimeError(
+                "ZeroGPU returned no image."
+            )
+
+        try:
+            from pathlib import Path
+
+            image_file = Path(image_path)
+
+            if not image_file.exists():
+                raise RuntimeError(
+                    "Generated image file does not exist."
+                )
+
+            image_bytes = image_file.read_bytes()
+
+        except Exception as error:
+            raise RuntimeError(
+                f"Failed to read generated image: {error}"
             )
 
         if not image_bytes:
@@ -371,7 +393,7 @@ class ModelEngine:
             )
 
         self.last_route = "image_generation"
-        self.last_provider = "huggingface"
+        self.last_provider = "huggingface_zerogpu"
         self.last_model = model
         self.last_error = None
 
