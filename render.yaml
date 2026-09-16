@@ -1,0 +1,54 @@
+services:
+  - type: web
+    name: void-ai
+    runtime: docker
+    plan: free
+    dockerfilePath: ./Dockerfile
+    dockerContext: .
+    healthCheckPath: /health
+    autoDeploy: true
+    envVars:
+      - key: PORT
+        value: "10000"
+      - key: NODE_ENV
+        value: production
+      - key: VOID_API_HOST
+        value: 127.0.0.1
+      - key: VOID_API_PORT
+        value: "8787"
+      - key: TELEGRAM_MODE
+        value: webhook
+      - key: TELEGRAM_WEBHOOK_PORT
+        value: "10001"
+      - key: TELEGRAM_WEBHOOK_PATH
+        value: /telegram
+      - key: VOID_ROUTER_BASE_URL
+        value: http://127.0.0.1:20128/v1
+      - key: VOID_ROUTER_API_KEY
+        value: ""
+      - key: ROUTER9_PORT
+        value: "20128"
+      - key: ROUTER9_DATA_DIR
+        value: /tmp/9router
+      - key: INITIAL_PASSWORD
+        generateValue: true
+      - key: JWT_SECRET
+        generateValue: true
+      - key: API_KEY_SECRET
+        generateValue: true
+      - key: MACHINE_ID_SALT
+        generateValue: true
+      - key: OPENROUTER_API_KEY
+        sync: false
+      - key: TELEGRAM_BOT_TOKEN
+        sync: false
+      - key: TELEGRAM_WEBHOOK_SECRET
+        generateValue: true
+      - key: GEMINI_API_KEY
+        sync: false
+      - key: JINA_API_KEY
+        sync: false
+      - key: GROQ_API_KEY
+        sync: false
+      - key: HF_TOKEN
+        sync: false

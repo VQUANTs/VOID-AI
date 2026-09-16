@@ -231,3 +231,21 @@ Useful commands:
 ```
 
 This is still phone-local. For a service that survives phone shutdown, move the same stack to a cloud host such as Render; Render web services provide a public HTTPS URL, but free services can spin down after 15 minutes of inactivity.
+
+## Render Free deployment
+
+VOID-AI can run on a single Render Free Web Service. The deployment bundles the
+existing VOID API, Telegram webhook, and 9Router in one container so VOID keeps
+using Router9 as its model gateway. Render supplies `PORT`/`RENDER_EXTERNAL_URL`;
+the included startup script configures the OpenRouter connection in 9Router on
+boot and registers the Telegram webhook automatically.
+
+Required Render secrets:
+
+- `OPENROUTER_API_KEY`
+- `TELEGRAM_BOT_TOKEN`
+
+Optional: `GEMINI_API_KEY`, `JINA_API_KEY`, `GROQ_API_KEY`, `HF_TOKEN`.
+
+Deploy with the included `render.yaml` Blueprint or configure a Docker Web
+Service with `./Dockerfile` and start command `./scripts/render_start.sh`.
