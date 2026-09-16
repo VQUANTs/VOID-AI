@@ -179,7 +179,10 @@ def main():
         name="9Router",
     )
 
-    wait_http(ROUTER + "/health", timeout=150)
+    # 9Router exposes its health endpoint under /api/health.
+    # /health is not a Router9 endpoint and returns 404, which previously
+    # caused the Render bootstrap to wait until it timed out.
+    wait_http(ROUTER + "/api/health", timeout=150)
     ensure_openrouter()
 
     start(
