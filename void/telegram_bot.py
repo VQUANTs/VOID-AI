@@ -36,6 +36,22 @@ class TelegramBot:
         self.tasks = self.ai.tasks
 
         self.updates = queue.Queue()
+        self.chat_models = {}
+
+        # Discover Router9 models when Telegram starts. The bot can still
+        # start if Router9 is temporarily unavailable; /models and normal
+        # chat retry discovery when Router9 returns.
+        try:
+            self.ai.model.refresh_models(force=True)
+            print(
+                f"VOID AI ROUTER9 | {len(self.ai.model.get_status().get('models', []))} models discovered",
+                flush=True,
+            )
+        except Exception as error:
+            print(
+                f"VOID AI ROUTER9 | discovery unavailable: {error}",
+                flush=True,
+            )
 
     # --------------------------------------------------
     # Telegram API
@@ -383,12 +399,40 @@ Task:
 
         if command == "/model":
 
+            if argument:
+                if argument.lower() in {"auto", "default", "none"}:
+                    self.chat_models.pop(str(chat_id), None)
+                    self.send_message(chat_id, "VOID > Model selection reset to Auto model.")
+                    return True
+
+                try:
+                    self.ai.model.refresh_models(force=True)
+                except Exception:
+                    pass
+
+                models = self.ai.model.get_status().get("models", [])
+                if argument not in models:
+                    self.send_message(
+                        chat_id,
+                        "VOID > Model not found. Use /models to see Router9 models."
+                    )
+                    return True
+
+                self.chat_models[str(chat_id)] = argument
+                self.send_message(chat_id, f"VOID > Model selected:\n{argument}")
+                return True
+
             status = self.ai.model.get_status()
+            selected = self.chat_models.get(str(chat_id), "auto")
 
             self.send_message(
                 chat_id,
                 f"ROUTE: {status['route']}\n"
-                f"MODEL: {status['model']}"
+                f"MODEL: {status['model']}\n"
+                f"SELECTED: {selected}\n"
+                f"MODELS: {len(status.get('models', []))}\n\n"
+                "Use /model <model-id> to select a model.\n"
+                "Use /model auto to return to automatic routing."
             )
 
             return True
@@ -396,6 +440,12 @@ Task:
         if command == "/status":
 
             status = self.ai.model.get_status()
+            if not status.get("models"):
+                try:
+                    self.ai.model.refresh_models(force=True)
+                    status = self.ai.model.get_status()
+                except Exception:
+                    pass
 
             message = (
                 "╔══════════════════════════════════╗\n"
@@ -407,6 +457,9 @@ Task:
                 f"║ PROVIDER   : {status['provider']:<20}║\n"
                 "║ AGENT      : READY               ║\n"
                 "║ TASKS      : READY               ║\n"
+                f"║ MODELS     : {len(status.get('models', [])):<20}║\n"
+                f"║ TOKENS     : {status.get('total_usage', {}).get('total_tokens', 0):<20}║\n"
+                f"║ CONTEXT    : {status.get('context_available') or status.get('context_window') or 'unknown':<20}║\n"
                 f"║ TOOLS      : {len(self.agent.tools.definitions()):<20}║\n"
                 "╚══════════════════════════════════╝"
             )
@@ -421,8 +474,17 @@ Task:
         if command == "/models":
             status = self.ai.model.get_status()
             models = status.get("models", [])
+            refresh_error = None
             if not models:
-                self.send_message(chat_id, "VOID > No Router9 models discovered.")
+                try:
+                    self.ai.model.refresh_models(force=True)
+                    status = self.ai.model.get_status()
+                    models = status.get("models", [])
+                except Exception as error:
+                    refresh_error = str(error)
+            if not models:
+                detail = f"\nReason: {refresh_error}" if refresh_error else ""
+                self.send_message(chat_id, "VOID > No Router9 models discovered." + detail)
             else:
                 self.send_message(chat_id, "ROUTER9 MODELS ({}):\n\n{}".format(len(models), "\n".join(models)))
             return True
@@ -594,7 +656,8 @@ Task:
 
         try:
             self.send_typing(chat_id)
-            answer = self.ai.ask(text, conversation_id=str(chat_id), model=model)
+            selected_model = model or self.chat_models.get(str(chat_id))
+            answer = self.ai.ask(text, conversation_id=str(chat_id), model=selected_model)
 
             formatted = VoidOutput.format(answer)
 

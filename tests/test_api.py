@@ -52,3 +52,25 @@ def test_openai_compatible_message_history_and_model():
     api = VoidAPI(FakeCoreFull())
     result = api.core.ask_messages([{"role":"user","content":"hello"}], model="router9/test", max_tokens=50)
     assert result == "v1 ok"
+
+
+def test_models_refreshes_empty_registry():
+    class Model: 
+        def get_status(self):
+            return {"models": ["router9/test"]}
+        def refresh_models(self, force=False):
+            return []
+    class Core:
+        model = Model()
+    api = VoidAPI(Core())
+    result = api.models()
+    assert result["count"] == 1
+    assert result["models"][0]["id"] == "router9/test"
+
+def test_browser_status_uses_nested_model_status():
+    from void import api as api_module
+    html = api_module.WEB_APP
+    assert "status.model&&typeof status.model==='object'" in html
+    assert "m.total_usage" in html
+    assert "m.context_available||m.context_window" in html
+    assert "Array.isArray(m.models)" in html

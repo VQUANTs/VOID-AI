@@ -39,7 +39,7 @@ def _positive_int(name, default, minimum=1, maximum=2147483647):
 
 class Config:
 
-    VERSION = "0.9.2"
+    VERSION = "0.9.5"
 
     # Router9 is VOID-AI's model gateway. It exposes an OpenAI-compatible /v1 API.
     ROUTER_BASE_URL = os.getenv(

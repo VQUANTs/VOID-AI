@@ -85,3 +85,26 @@ def test_router9_is_single_gateway_and_default_is_selected(monkeypatch):
         Config.GROQ_API_KEY = old_groq
         server.shutdown()
         thread.join(timeout=2)
+
+
+def test_model_usage_tracking(monkeypatch):
+    from void.models import ModelEngine
+    from types import SimpleNamespace
+
+    engine = ModelEngine()
+    engine.router.chat = lambda *args, **kwargs: SimpleNamespace(
+        json=lambda: {
+            "choices": [{"message": {"content": "ok"}}],
+            "usage": {"prompt_tokens": 7, "completion_tokens": 5, "total_tokens": 12},
+        }
+    )
+    engine.router.last_route = "fast"
+    engine.router.last_model = "test-model"
+    engine.router.last_provider = "router9"
+    engine.router.last_context_window = 8192
+    response = engine.chat([{"role": "user", "content": "hi"}])
+    assert response.json()["usage"]["total_tokens"] == 12
+    status = engine.get_status()
+    assert status["usage"]["total_tokens"] == 12
+    assert status["total_usage"]["total_tokens"] == 12
+    assert status["context_available"] == 8192

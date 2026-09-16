@@ -29,6 +29,8 @@ class ModelEngine:
         self.last_model = ""
         self.last_provider = ""
         self.last_error = None
+        self.last_usage = {"prompt_tokens": 0, "completion_tokens": 0, "total_tokens": 0}
+        self.total_usage = {"prompt_tokens": 0, "completion_tokens": 0, "total_tokens": 0}
 
     def choose_route(self, text):
         return self.router.infer_route(text)
@@ -75,7 +77,34 @@ class ModelEngine:
             status["model"] = self.last_model
         if self.last_provider:
             status["provider"] = self.last_provider
+        status["usage"] = dict(self.last_usage)
+        status["total_usage"] = dict(self.total_usage)
+        status["context_window"] = self.router.last_context_window
+        status["context_available"] = self.router.last_context_window
         return status
+
+    @staticmethod
+    def _normalize_usage(usage):
+        usage = usage if isinstance(usage, dict) else {}
+        values = {}
+        for key in ("prompt_tokens", "completion_tokens", "total_tokens"):
+            try:
+                values[key] = max(0, int(usage.get(key, 0) or 0))
+            except (TypeError, ValueError):
+                values[key] = 0
+        if not values["total_tokens"]:
+            values["total_tokens"] = values["prompt_tokens"] + values["completion_tokens"]
+        return values
+
+    def _record_usage(self, response):
+        try:
+            data = response.json()
+        except Exception:
+            return
+        usage = self._normalize_usage(data.get("usage"))
+        self.last_usage = usage
+        for key, value in usage.items():
+            self.total_usage[key] = self.total_usage.get(key, 0) + value
 
     def chat(self, messages, model=None, stream=False, temperature=0.7, max_tokens=None, **kwargs):
         response = self.router.chat(
@@ -85,10 +114,16 @@ class ModelEngine:
         self.last_route = self.router.last_route
         self.last_model = self.router.last_model
         self.last_provider = self.router.last_provider
+        self._record_usage(response)
         return response
 
     def chat_with_tools(self, messages, tools, model=None):
-        return self.router.chat(messages, model=model, tools=tools, stream=False)
+        response = self.router.chat(messages, model=model, tools=tools, stream=False)
+        self.last_route = self.router.last_route
+        self.last_model = self.router.last_model
+        self.last_provider = self.router.last_provider
+        self._record_usage(response)
+        return response
 
     def chat_with_image(self, image_bytes, mime_type, prompt):
         if not isinstance(image_bytes, (bytes, bytearray)) or not image_bytes:
@@ -108,6 +143,9 @@ class ModelEngine:
                 messages, route="vision", required_capability="vision"
             )
             self.last_route = "vision"
+            self.last_model = self.router.last_model
+            self.last_provider = self.router.last_provider
+            self._record_usage(response)
             return response
         except Exception:
             if not self.gemini_key:

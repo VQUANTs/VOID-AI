@@ -1,4 +1,4 @@
-# VOID-AI 0.9.2
+# VOID-AI 0.9.5
 
 VOID-AI is the shared brain for the VOID system. The CLI, HTTP/API, browser
 interface and Telegram interface all use the same `VoidCore`, memory,

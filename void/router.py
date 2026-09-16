@@ -30,6 +30,7 @@ class ModelRouter:
         self.last_model = ""
         self.last_provider = ""
         self.last_error = None
+        self.last_context_window = None
 
     def refresh(self, force=False):
         return self.registry.refresh(force=force)
@@ -105,6 +106,7 @@ class ModelRouter:
         self.last_route = route
         self.last_model = selected.id
         self.last_provider = selected.provider
+        self.last_context_window = selected.context_window
         return selected
 
     def chat(self, messages, model: Optional[str] = None, route: Optional[str] = None,
@@ -146,6 +148,7 @@ class ModelRouter:
             )
             self.last_model = selected.id
             self.last_provider = selected.provider
+            self.last_context_window = selected.context_window
             self.last_error = None
             return response
         except Exception as exc:
@@ -172,6 +175,7 @@ class ModelRouter:
                 )
                 self.last_model = fallback.id
                 self.last_provider = fallback.provider
+                self.last_context_window = fallback.context_window
                 return response
             except Exception as fallback_exc:
                 raise RuntimeError(
@@ -188,4 +192,5 @@ class ModelRouter:
             "model_count": len(self.registry.models),
             "provider_errors": dict(self.registry.errors),
             "error": self.last_error,
+            "context_window": self.last_context_window,
         }
