@@ -204,10 +204,14 @@ def main():
         name="Telegram webhook",
     )
     wait_http(f"http://127.0.0.1:{TELEGRAM_PORT}/health", timeout=90)
-    set_telegram_webhook()
 
-    # Public Render port is the only foreground listener.
+    # Start the public Render listener before registering the Telegram webhook.
+    # Telegram validates the webhook URL when setWebhook is called, so the
+    # public endpoint must already be reachable at that point.
     proxy = start([sys.executable, "scripts/render_proxy.py"], name="Render proxy")
+    wait_http(f"http://127.0.0.1:{PUBLIC_PORT}/health", timeout=30)
+
+    set_telegram_webhook()
     print(f"[render] VOID-AI stack ready on public port {PUBLIC_PORT}", flush=True)
 
     while True:
