@@ -72,7 +72,7 @@ for the default local Router9 setup.
 **Vision fallback:** `GEMINI_API_KEY` (only needed if Router9 does not expose a
 vision-capable model).
 
-**Video:** `GEMINI_API_KEY`
+**Video:** `GEMINI_API_KEY`; VOID automatically retries/falls back across the configured Gemini video models.
 
 **Image generation:** `HF_TOKEN`
 
@@ -207,3 +207,27 @@ python server.py
 Then open `http://127.0.0.1:8787/`.
 
 Run `python scripts/live_check.py` from an environment with network access to verify configured external services. It never prints credential values.
+
+
+## Android auto-start (no manual Termux start after reboot)
+
+For a phone-local setup, install **Termux:Boot** once, then run:
+
+```bash
+cd ~/VOID-AI
+mkdir -p ~/.termux/boot
+cp scripts/termux-boot/void-stack ~/.termux/boot/void-stack
+chmod +x ~/.termux/boot/void-stack
+./scripts/start_void_stack.sh
+```
+
+The boot script starts Router9, the VOID web API, and the Telegram polling bot automatically after Android boots. Logs are stored in `~/.void-stack/`.
+
+Useful commands:
+
+```bash
+./scripts/status_void_stack.sh
+./scripts/stop_void_stack.sh
+```
+
+This is still phone-local. For a service that survives phone shutdown, move the same stack to a cloud host such as Render; Render web services provide a public HTTPS URL, but free services can spin down after 15 minutes of inactivity.

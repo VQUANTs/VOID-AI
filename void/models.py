@@ -190,52 +190,72 @@ class ModelEngine:
             raise ValueError("Video exceeds the 10 MB processing limit.")
         if not self.gemini_key:
             raise RuntimeError("GEMINI_API_KEY is required for video analysis.")
-        payload = {
+
+        requested = [Config.GEMINI_VIDEO_MODEL]
+        requested.extend(Config.GEMINI_VIDEO_MODELS)
+        models = list(dict.fromkeys(x for x in requested if x))
+        payload_base = {
             "contents": [{"parts": [
-                {"inline_data": {"mime_type": mime_type or "video/mp4",
-                                 "data": base64.b64encode(video_bytes).decode("ascii")}},
+                {"inline_data": {
+                    "mime_type": mime_type or "video/mp4",
+                    "data": base64.b64encode(video_bytes).decode("ascii"),
+                }},
                 {"text": prompt or "Analyze this video carefully."},
             ]}],
             "generationConfig": {"temperature": 0.7, "maxOutputTokens": 1200},
         }
-        url = (
-            "https://generativelanguage.googleapis.com/v1beta/models/"
-            f"{Config.GEMINI_VIDEO_MODEL}:generateContent"
+
+        failures = []
+        for model_name in models:
+            url = (
+                "https://generativelanguage.googleapis.com/v1beta/models/"
+                f"{model_name}:generateContent"
+            )
+            last_response = None
+            for attempt in range(3):
+                try:
+                    response = requests.post(
+                        url,
+                        json=payload_base,
+                        headers={
+                            "x-goog-api-key": self.gemini_key,
+                            "Content-Type": "application/json",
+                        },
+                        timeout=(15, 300),
+                    )
+                    last_response = response
+                    if response.status_code < 400:
+                        data = response.json()
+                        parts = data.get("candidates", [{}])[0].get("content", {}).get("parts", [])
+                        answer = "\n".join(
+                            p.get("text", "").strip()
+                            for p in parts
+                            if isinstance(p.get("text"), str) and p.get("text", "").strip()
+                        ).strip()
+                        if not answer:
+                            failures.append(f"{model_name}: empty response")
+                            break
+                        self.last_route = "video"
+                        self.last_provider = "gemini"
+                        self.last_model = model_name
+                        return answer
+
+                    if response.status_code not in {429, 500, 502, 503, 504}:
+                        failures.append(f"{model_name}: HTTP {response.status_code}: {response.text[:500]}")
+                        break
+                    failures.append(f"{model_name}: HTTP {response.status_code}")
+                    if attempt < 2:
+                        time.sleep(2 ** attempt)
+                except requests.RequestException as exc:
+                    failures.append(f"{model_name}: {exc}")
+                    if attempt < 2:
+                        time.sleep(2 ** attempt)
+
+        details = "; ".join(failures[-8:])
+        raise RuntimeError(
+            "All configured Gemini video models failed. "
+            + (details or "No usable response was returned.")
         )
-        response = None
-        last = None
-        for attempt in range(3):
-            try:
-                response = requests.post(
-                    url, json=payload,
-                    headers={"x-goog-api-key": self.gemini_key, "Content-Type": "application/json"},
-                    timeout=(15, 300),
-                )
-                if response.status_code not in {429, 500, 502, 503, 504}:
-                    break
-                last = response
-                if attempt < 2:
-                    time.sleep(2 ** attempt)
-            except requests.RequestException as exc:
-                if attempt == 2:
-                    raise RuntimeError(f"Gemini video request failed: {exc}") from exc
-                time.sleep(2 ** attempt)
-        if response is None:
-            if last is None:
-                raise RuntimeError("Gemini video request produced no response")
-            response = last
-        if response.status_code in {429, 500, 502, 503, 504} and last is not None:
-            response = last
-        response.raise_for_status()
-        data = response.json()
-        parts = data.get("candidates", [{}])[0].get("content", {}).get("parts", [])
-        answer = "\n".join(
-            p.get("text", "").strip() for p in parts if isinstance(p.get("text"), str) and p.get("text", "").strip()
-        ).strip()
-        if not answer:
-            raise RuntimeError("Video model returned an empty answer.")
-        self.last_route, self.last_provider, self.last_model = "video", "gemini", Config.GEMINI_VIDEO_MODEL
-        return answer
 
     @staticmethod
     def extract_tool_calls(data):

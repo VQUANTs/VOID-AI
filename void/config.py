@@ -102,6 +102,12 @@ class Config:
 
     GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-3.6-flash")
     GEMINI_VIDEO_MODEL = os.getenv("GEMINI_VIDEO_MODEL", "gemini-3.8-flash")
+    GEMINI_VIDEO_MODELS = tuple(
+        x.strip() for x in os.getenv(
+            "GEMINI_VIDEO_MODELS",
+            "gemini-3.8-flash,gemini-3.7-flash,gemini-3.6-flash,gemini-3.5-flash-lite"
+        ).split(",") if x.strip()
+    )
 
     DEFAULT_MODEL = "openrouter/openrouter/free"
 

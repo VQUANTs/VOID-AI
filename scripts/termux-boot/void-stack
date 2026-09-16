@@ -1,0 +1,4 @@
+#!/data/data/com.termux/files/usr/bin/bash
+sleep 8
+cd "$HOME/VOID-AI" || exit 1
+./scripts/start_void_stack.sh
