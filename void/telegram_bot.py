@@ -939,6 +939,98 @@ class WebhookHandler(BaseHTTPRequestHandler):
 
     def do_POST(self):
 
+        # --------------------------------------------------
+        # VOID Android -> Brain API
+        # --------------------------------------------------
+
+        if self.path == "/ai/chat":
+
+            try:
+
+                length = int(
+                    self.headers.get(
+                        "Content-Length",
+                        "0"
+                    )
+                )
+
+                if length <= 0 or length > 150000:
+
+                    self.send_json(
+                        413,
+                        {
+                            "ok": False,
+                            "error": "invalid request size"
+                        }
+                    )
+
+                    return
+
+                raw = self.rfile.read(length)
+
+                payload = json.loads(raw)
+
+                prompt = str(
+                    payload.get(
+                        "prompt",
+                        ""
+                    )
+                ).strip()
+
+                context = str(
+                    payload.get(
+                        "context",
+                        ""
+                    ) or ""
+                )
+
+                if not prompt:
+
+                    self.send_json(
+                        400,
+                        {
+                            "ok": False,
+                            "error": "prompt required"
+                        }
+                    )
+
+                    return
+
+                answer = BOT.ai.ask_with_app_context(
+                    prompt,
+                    context
+                )
+
+                status = BOT.ai.model.get_status()
+
+                self.send_json(
+                    200,
+                    {
+                        "ok": True,
+                        "answer": answer,
+                        "model": status.get("model"),
+                        "provider": status.get("provider"),
+                        "route": status.get("route")
+                    }
+                )
+
+            except Exception as error:
+
+                print(
+                    f"AI BRIDGE ERROR: {error}",
+                    flush=True
+                )
+
+                self.send_json(
+                    500,
+                    {
+                        "ok": False,
+                        "error": str(error)
+                    }
+                )
+
+            return
+
         expected_path = os.getenv(
             "TELEGRAM_WEBHOOK_PATH",
             "/telegram"
