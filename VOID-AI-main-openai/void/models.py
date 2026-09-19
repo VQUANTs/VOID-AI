@@ -13,6 +13,7 @@ class ModelEngine:
     def __init__(self):
 
         self.gemini_key = Config.GEMINI_API_KEY
+        self.openai_key = Config.OPENAI_API_KEY
         self.groq_key = Config.GROQ_API_KEY
         self.hf_token = Config.HF_TOKEN
 
@@ -146,6 +147,7 @@ class ModelEngine:
 
         return [
             Config.GEMINI_MODEL,
+            Config.OPENAI_MODEL,
             Config.GROQ_MODEL
         ]
 
@@ -161,10 +163,12 @@ class ModelEngine:
             "provider": self.last_provider,
             "candidates": [
                 Config.GEMINI_MODEL,
+                Config.OPENAI_MODEL,
                 Config.GROQ_MODEL
             ],
-            "fallback": Config.GROQ_MODEL,
+            "fallback": Config.OPENAI_MODEL,
             "gemini": bool(self.gemini_key),
+            "openai": bool(self.openai_key),
             "groq": bool(self.groq_key),
             "openrouter": False,
             "free_models": 0,
@@ -205,6 +209,49 @@ class ModelEngine:
 
         return requests.post(
             Config.GEMINI_URL,
+            json=payload,
+            headers=headers,
+            timeout=(15, 180),
+            stream=stream
+        )
+
+    # --------------------------------------------------
+    # OpenAI request
+    # --------------------------------------------------
+
+    def _openai_request(
+        self,
+        messages,
+        stream=False,
+        tools=None,
+        tool_choice=None,
+        model=None
+    ):
+
+        if model is None:
+            model = Config.OPENAI_MODEL
+
+        payload = {
+            "model": model,
+            "messages": messages,
+            "stream": stream
+        }
+
+        if tools:
+            payload["tools"] = tools
+
+        if tool_choice is not None:
+            payload["tool_choice"] = tool_choice
+
+        headers = {
+            "Authorization":
+            f"Bearer {self.openai_key}",
+            "Content-Type":
+            "application/json"
+        }
+
+        return requests.post(
+            Config.OPENAI_URL,
             json=payload,
             headers=headers,
             timeout=(15, 180),
@@ -289,6 +336,35 @@ class ModelEngine:
                 return response
 
         # --------------------------------------------------
+        # Fallback: OpenAI Vision
+        # --------------------------------------------------
+
+        if self.openai_key:
+
+            response = self._openai_request(
+                messages,
+                stream=False
+            )
+
+            if response.status_code not in {
+                408,
+                429,
+                500,
+                502,
+                503,
+                504
+            }:
+
+                self._check_response(response)
+
+                self.last_route = "vision"
+                self.last_provider = "openai"
+                self.last_model = Config.OPENAI_MODEL
+                self.last_error = None
+
+                return response
+
+        # --------------------------------------------------
         # Fallback: Groq Vision
         # --------------------------------------------------
 
@@ -298,7 +374,7 @@ class ModelEngine:
 
             raise RuntimeError(
                 "No vision provider is available. "
-                "GEMINI_API_KEY and GROQ_API_KEY are missing."
+                "Configure GEMINI_API_KEY, OPENAI_API_KEY, or GROQ_API_KEY."
             )
 
         response = self._groq_request(
@@ -775,6 +851,40 @@ class ModelEngine:
                 )
 
         # ----------------------------------------------
+        # FALLBACK: OPENAI
+        # ----------------------------------------------
+
+        if self.openai_key:
+
+            try:
+
+                response = self._openai_request(
+                    messages,
+                    stream=stream,
+                    tools=tools,
+                    tool_choice=tool_choice
+                )
+
+                self._check_response(response)
+
+                self.last_provider = "openai"
+                self.last_model = Config.OPENAI_MODEL
+
+                self.last_error = (
+                    "; ".join(errors)
+                    if errors
+                    else None
+                )
+
+                return response
+
+            except Exception as error:
+
+                errors.append(
+                    f"OpenAI: {error}"
+                )
+
+        # ----------------------------------------------
         # FALLBACK: GROQ
         # ----------------------------------------------
 
@@ -903,6 +1013,7 @@ class ModelEngine:
 
         if (
             not self.gemini_key
+            and not self.openai_key
             and not self.groq_key
             and not self.hf_client
         ):

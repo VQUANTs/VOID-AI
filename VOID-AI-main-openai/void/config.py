@@ -22,6 +22,20 @@ class Config:
         ""
     )
 
+    OPENAI_API_KEY = os.getenv(
+        "OPENAI_API_KEY",
+        ""
+    )
+
+    OPENAI_URL = (
+        "https://api.openai.com/v1/chat/completions"
+    )
+
+    OPENAI_MODEL = os.getenv(
+        "OPENAI_MODEL",
+        "gpt-5.2"
+    )
+
     HF_TOKEN = os.getenv(
         "HF_TOKEN",
         ""
